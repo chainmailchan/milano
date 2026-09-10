@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#17130f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Milano 14–18 Sept</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#17130f; --panel:#221c17; --panel2:#2b241e; --line:#3a3128;
+  --ink:#f1e8da; --ink2:#bfb2a0; --ink3:#8d8172;
+  --saffron:#d9a441; --saffron-ink:#1a1408;
+  --c-base:#f1e8da; --c-coffee:#c99a6b; --c-gelato:#8ecfc4; --c-tiramisu:#e6c17a;
+  --c-dinner:#d97b5a; --c-asian:#d46a80; --c-cheap:#a9bd6a; --c-fitness:#6faed3;
+  --c-shop:#b79bd9; --c-sight:#9aa7b5; --c-figurine:#f0a6c8; --c-camera:#e9e2cf;
+  --sheet-h: 46vh;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,sans-serif;font-size:15px;line-height:1.45;overscroll-behavior:none}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+a{color:inherit}
+h1,h2,h3,.serif{font-family:Fraunces,Georgia,serif;font-weight:600;letter-spacing:-.01em}
+#app{height:100dvh;display:flex;flex-direction:column}
+header{padding:calc(env(safe-area-inset-top) + 12px) 16px 10px;display:flex;align-items:baseline;justify-content:space-between;border-bottom:1px solid var(--line);background:var(--bg)}
+header h1{margin:0;font-size:22px;font-weight:600}
+header h1 em{font-style:italic;font-weight:400;color:var(--saffron)}
+header .date{color:var(--ink2);font-size:13px}
+main{flex:1;position:relative;overflow:hidden}
+.view{position:absolute;inset:0;display:none}
+.view.active{display:block}
+
+/* ---- map ---- */
+#map{position:absolute;inset:0;background:#0f0c09}
+.leaflet-container{font:inherit}
+.leaflet-control-attribution{background:rgba(23,19,15,.75)!important;color:var(--ink3)!important;font-size:10px}
+.leaflet-control-attribution a{color:var(--ink2)!important}
+.leaflet-control-zoom a{background:var(--panel)!important;color:var(--ink)!important;border-color:var(--line)!important}
+.pin{width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid var(--bg);box-shadow:0 2px 6px rgba(0,0,0,.6);position:relative}
+.pin::after{content:"";position:absolute;inset:6px;border-radius:50%;background:var(--bg);opacity:.35}
+.pin.base{border-radius:6px;transform:none;background:var(--saffron)}
+.pin.base::after{display:none}
+.filterbtn{position:absolute;top:10px;left:12px;z-index:500;display:flex;align-items:center;gap:8px;padding:9px 14px;border-radius:999px;background:rgba(34,28,23,.94);border:1px solid var(--line);color:var(--ink);font-size:14px;font-weight:500;backdrop-filter:blur(6px);box-shadow:0 2px 8px rgba(0,0,0,.4)}
+.filterbtn .dot{width:9px;height:9px;border-radius:50%;background:var(--dot)}
+.filterbtn .count{color:var(--ink3);font-weight:400}
+.panel{position:absolute;inset:0;z-index:700;background:rgba(23,19,15,.78);display:none;align-items:flex-start;padding:56px 12px 12px}
+.panel.open{display:flex}
+.panel .grid{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px;max-height:calc(100% - 20px);overflow:auto}
+.panel .opt{display:flex;align-items:center;gap:9px;padding:12px 12px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);color:var(--ink2);font-size:14px;font-weight:500;text-align:left;line-height:1.2}
+.panel .opt .dot{flex:0 0 9px;width:9px;height:9px;border-radius:50%;background:var(--dot)}
+.panel .opt.on{color:var(--ink);border-color:var(--saffron);background:#3a2f1c}
+.panel .opt.all{grid-column:1/-1;justify-content:center}
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:600;background:var(--panel);border-top:1px solid var(--line);border-radius:18px 18px 0 0;padding:10px 16px calc(16px + env(safe-area-inset-bottom));transform:translateY(105%);transition:transform .22s ease;max-height:var(--sheet-h);overflow:auto}
+.sheet.open{transform:translateY(0)}
+.sheet .grab{width:38px;height:4px;border-radius:2px;background:var(--line);margin:0 auto 12px}
+.sheet .close{position:absolute;top:10px;right:12px;color:var(--ink3);font-size:22px;line-height:1;padding:4px 8px}
+@media (prefers-reduced-motion: reduce){.sheet{transition:none}}
+
+/* ---- cards ---- */
+.card{padding:14px 0;border-bottom:1px solid var(--line)}
+.card:last-child{border-bottom:0}
+.card .top{display:flex;align-items:flex-start;gap:10px}
+.card .swatch{flex:0 0 10px;width:10px;height:10px;border-radius:50%;margin-top:7px;background:var(--dot)}
+.card h3{margin:0;font-size:18px;line-height:1.2}
+.card .meta{color:var(--ink2);font-size:13px;margin-top:3px}
+.card .meta b{color:var(--ink);font-weight:500}
+.card .note{margin:8px 0 0;color:var(--ink);font-size:14px}
+.card .src{color:var(--ink3);font-size:12px;margin-top:6px}
+.badge{display:inline-block;font-size:11px;font-weight:600;padding:2px 7px;border-radius:5px;margin-left:6px;vertical-align:1px}
+.badge.closed{background:#5a2a24;color:#ffd9d2}
+.badge.treat{background:#4a3a14;color:var(--saffron)}
+.badge.near{background:#1f3a2c;color:#bfe8cf}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.actions button,.actions a{display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 8px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);font-size:13px;font-weight:500;text-decoration:none;text-align:center}
+.actions .primary{background:var(--saffron);color:var(--saffron-ink);border-color:var(--saffron)}
+.actions .wide{grid-column:1/-1}
+.actions svg{width:15px;height:15px;flex:0 0 auto}
+
+/* ---- list ---- */
+.list{position:absolute;inset:0;overflow:auto;padding:0 16px calc(24px + env(safe-area-inset-bottom))}
+.list .intro{color:var(--ink2);font-size:13px;padding:14px 0 4px}
+.group{margin-top:18px}
+.group h2{font-size:15px;font-weight:600;margin:0 0 2px;display:flex;align-items:center;gap:8px;position:sticky;top:0;background:var(--bg);padding:10px 0 8px;z-index:2}
+.group h2 .dot{width:9px;height:9px;border-radius:50%;background:var(--dot)}
+.group h2 small{color:var(--ink3);font-weight:400;font-size:12px}
+.group .blurb{color:var(--ink2);font-size:13px;margin:0 0 4px}
+.jump{display:flex;gap:8px;overflow-x:auto;padding:12px 0 4px;scrollbar-width:none}
+.jump::-webkit-scrollbar{display:none}
+.jump button{flex:0 0 auto;padding:6px 11px;border-radius:999px;border:1px solid var(--line);color:var(--ink2);font-size:13px}
+
+/* ---- info ---- */
+.info{position:absolute;inset:0;overflow:auto;padding:4px 16px calc(24px + env(safe-area-inset-bottom))}
+.info h2{font-size:17px;margin:22px 0 8px}
+.info p,.info li{color:var(--ink);font-size:14px;margin:0 0 8px}
+.info ul{padding-left:18px;margin:0}
+.info .tag{color:var(--ink3);font-size:12px}
+.info table{width:100%;border-collapse:collapse;font-size:14px}
+.info td{padding:7px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.info td:first-child{color:var(--ink2);width:34%}
+
+/* ---- tabs ---- */
+nav{display:flex;border-top:1px solid var(--line);background:var(--bg);padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;padding:12px 0 10px;color:var(--ink3);font-size:12px;font-weight:500;display:flex;flex-direction:column;align-items:center;gap:3px}
+nav button svg{width:22px;height:22px}
+nav button.on{color:var(--saffron)}
+.toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 14px;border-radius:999px;font-size:13px;font-weight:500;opacity:0;pointer-events:none;transition:opacity .2s;z-index:900}
+.toast.show{opacity:1}
+button:focus-visible,a:focus-visible{outline:2px solid var(--saffron);outline-offset:2px}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>Milano, <em>due</em></h1>
+    <span class="date">Mon 14 – Fri 18 Sept</span>
+  </header>
+  <main>
+    <section id="view-map" class="view active">
+      <div id="map" role="application" aria-label="Map of places"></div>
+      <button class="filterbtn" id="filterbtn" aria-haspopup="dialog" aria-expanded="false"><span class="dot" id="filterdot" style="--dot:var(--saffron)"></span><span id="filterlabel">All places</span><span class="count" id="filtercount"></span></button>
+      <div class="panel" id="panel" role="dialog" aria-label="Choose a category"><div class="grid" id="panelgrid"></div></div>
+      <div class="sheet" id="sheet" aria-live="polite">
+        <div class="grab"></div>
+        <button class="close" id="sheetClose" aria-label="Close">×</button>
+        <div id="sheetBody"></div>
+      </div>
+    </section>
+    <section id="view-list" class="view">
+      <div class="list" id="list"></div>
+    </section>
+    <section id="view-info" class="view">
+      <div class="info" id="info"></div>
+    </section>
+  </main>
+  <nav>
+    <button data-view="map" class="on" aria-label="Map">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6-5.3-6-11a6 6 0 1 1 12 0c0 5.7-6 11-6 11z"/><circle cx="12" cy="10" r="2.3"/></svg>Map</button>
+    <button data-view="list" aria-label="List">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1" fill="currentColor"/><circle cx="4" cy="12" r="1" fill="currentColor"/><circle cx="4" cy="18" r="1" fill="currentColor"/></svg>List</button>
+    <button data-view="info" aria-label="Info">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>Info</button>
+  </nav>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+// ---------- data ----------
+const CATS = {
+  base:    {label:"Base & transit", color:"var(--c-base)",    blurb:"Where you sleep, where you work, how you get between them."},
+  coffee:  {label:"Coffee & breakfast", color:"var(--c-coffee)", blurb:"Specialty for the flat-white crowd, historic bars for the stand-at-the-counter espresso."},
+  gelato:  {label:"Gelato", color:"var(--c-gelato)",  blurb:"Six Gambero Rosso Tre Coni in the city plus two neighbourhood picks. Taste for structure and overrun, not just flavour."},
+  tiramisu:{label:"Tiramisù & pastry", color:"var(--c-tiramisu)", blurb:"The everyday Italian tiramisù is the trattoria house version, ~€6. These are the specialist and historic benchmarks."},
+  dinner:  {label:"Dinner (Milanese)", color:"var(--c-dinner)",  blurb:"Risotto alla milanese, cotoletta, ossobuco. Offal avoided. Book everything; Milan fills up."},
+  asian:   {label:"Asian", color:"var(--c-asian)",   blurb:"Chinatown (Via Paolo Sarpi) is 20 min on foot from the residence. Mostly Wenzhou and northern street food; Ta-Hua for Cantonese."},
+  cheap:   {label:"Cheap & fast", color:"var(--c-cheap)",   blurb:"€3–10 and standing up. Also: aperitivo (drink + buffet, €10–14) works as dinner."},
+  fitness: {label:"Fitness", color:"var(--c-fitness)", blurb:"Day pass gyms need no Italian tax code at Virgin Active. Gold's Gym and McFIT do, so they are not listed."},
+  shop:    {label:"Shops & souvenirs", color:"var(--c-shop)",    blurb:"Panettone, coffee beans, saffron, Grana. Meat products cannot come home to Singapore; hard cheese can (verify with SFA)."},
+  sight:   {label:"Sights", color:"var(--c-sight)",   blurb:"Monday closes most museums. Duomo, Castello and Fondazione Prada are open."},
+  figurine:{label:"Figurine photo spots", color:"var(--c-figurine)", blurb:"Small-scale backdrops with a ledge or floor to stand a figure on, colour, and light. Early morning beats crowds at every one of these. Food counters work too: a Ciacco cup, a Marchesi green box, a Luini panzerotto."},
+  camera:  {label:"Camera (EOS R)", color:"var(--c-camera)",  blurb:"Landmark, skyline, street and interior spots chosen for a 24–70. Tripods are refused on the Duomo roof and in most churches; no flash inside churches. Ask before photographing exhibitor stands at Lineapelle."}
+};
+const BASE = {lat:45.4748971, lng:9.1457354};
+// src legend: [G] Google Places today · [P] Italian food press 2025–26 · [S] venue site · [K] my knowledge, unverified for 2026
+const PLACES = [
+ // base
+ {id:"residence",cat:"base",name:"Residence Portello",addr:"Via Mosè Bianchi 75",lat:45.4748971,lng:9.1457354,pid:"ChIJ9WS1sHbBhkcRK6pyz58VQYE",hours:"Check-in 15:00, check-out 10:00",price:"",note:"Amendola (M1) is 5 min on foot and runs direct to Rho Fiera one way, Duomo the other. Lotto (M1/M5) is also close. Esselunga is 400 m away.",src:"[S][G]"},
+ {id:"fiera",cat:"base",name:"Fiera Milano Rho",addr:"Strada Statale Sempione 28, Rho",lat:45.5197013,lng:9.07896,pid:"ChIJj20xf93qhkcRGTv63zRvsFM",hours:"Lineapelle: Tue–Wed 9–18, Thu 9–16",price:"Fair meals €12–18",note:"M1 from Amendola ~25 min. Board trains marked Rho Fieramilano, not Bisceglie. Bars and restaurants line the covered Vela walkway; vending machines at hall receptions. Quality is fair-standard: eat breakfast in town.",src:"[S][G]"},
+ {id:"amendola",cat:"base",name:"Amendola (M1)",addr:"Piazza Amendola",lat:45.4735619,lng:9.151326,pid:"ChIJo7kWxXHBhkcRuXrrQ1fdwK4",hours:"",price:"€2.20 single, 90 min",note:"Your home station. No paper tickets since Jan 2026: tap a contactless card at the gate or buy a RicaricaMi card. Escalators reported out of service, so carry luggage.",src:"[P][G]"},
+ {id:"cadorna",cat:"base",name:"Milano Cadorna",addr:"Piazzale Cadorna",lat:45.468434,lng:9.1755389,pid:"ChIJr02uKFDBhkcRxhMTkXKk044",hours:"",price:"Malpensa Express ~€13",note:"Malpensa Express terminus, ~37 min from T1. Then M1 three stops to Amendola. Return the same way on Friday; ticket machines have English.",src:"[K][G]"},
+ // coffee
+ {id:"orsonero-lomazzo",cat:"coffee",name:"Orsonero Coffee (Lomazzo)",addr:"Via Paolo Lomazzo 20",lat:45.4822938,lng:9.1720711,pid:"ChIJU6E0GZHBhkcR4jgaRSziuOA",hours:"Mon–Sat 9–16",closed:["Sun"],price:"€",note:"Closest specialty coffee to the residence, in Chinatown. Second site of Milan's first specialty bar (2016). Sells beans from European roasters: a good souvenir. Ramenamano is in the same building.",src:"[P][G]"},
+ {id:"orsonero-broggi",cat:"coffee",name:"Orsonero Coffee (Porta Venezia)",addr:"Via Giuseppe Broggi 15",lat:45.4777424,lng:9.2112972,pid:"ChIJYV131cHGhkcRU3btwb85dQ4",hours:"Tue–Fri 8–17, Sat 9–17, Sun 9–13",closed:["Mon"],price:"€",note:"The original. Flat white and pour-over both praised; expect a short queue. Pair with Consorzio Stoppani nearby for dinner.",src:"[P][G]"},
+ {id:"loste",cat:"coffee",name:"Loste Café",addr:"Via Francesco Guicciardini 3",lat:45.4671215,lng:9.2087937,pid:"ChIJF2qT1A7HhkcRi7jbuj5MX10",hours:"Daily 8–15",price:"€€",note:"Founders met at Noma Sydney. Scandinavian light roasts, cinnamon rolls, potato pizzette. Weekday mornings are calm; weekends queue 30 min or more.",src:"[P][G]"},
+ {id:"pave",cat:"coffee",name:"Pavé",addr:"Via Felice Casati 27",lat:45.479137,lng:9.2025687,pid:"ChIJR3Kw9PDHhkcRMEZH5KMCt_o",hours:"Daily 8–19",price:"€€",note:"Informal high-quality pastry. Tiramisù served in a glass with specialty coffee. Also excellent panettone if you want a modern one to bring home.",src:"[P][G]"},
+ {id:"cucchi",cat:"coffee",name:"Pasticceria Cucchi",addr:"Corso Genova 1",lat:45.4584945,lng:9.1775838,pid:"ChIJHbneI_7DhkcRtYbVVMCFMNI",hours:"Daily 7:30–21:30",price:"€€",note:"Historic Milanese bar since 1936, antique interior, pavement tables. Good for a traditional cappuccino-and-brioche breakfast or an aperitivo before the Navigli.",src:"[K][G]"},
+ {id:"gattullo",cat:"coffee",name:"Pasticceria Gattullo",addr:"Piazzale di Porta Lodovica 2",lat:45.4520079,lng:9.1858464,pid:"ChIJJQkSIQTEhkcRLX9Z21Gf9Qo",hours:"Tue–Sun 7–20:30",closed:["Mon"],price:"€€",note:"Since 1961, the Bocconi crowd's breakfast. Sandwiches, pastries, shaded garden. Table service costs more than the counter, as everywhere.",src:"[P][G]"},
+ // gelato
+ {id:"massimo",cat:"gelato",name:"Il Massimo del Gelato",addr:"Via Castelvetro 18",lat:45.4846441,lng:9.1644969,pid:"ChIJn69qYRbBhkcRFNzdEbVuSuQ",hours:"Tue–Sun 12–23",closed:["Mon"],price:"€",note:"Neighbourhood institution 1.5 km from the residence. Dense, low-overrun style; seven dark chocolate percentages side by side, which is a useful tasting exercise. Fruit crates visible at the door.",src:"[K][G]"},
+ {id:"artico",cat:"gelato",name:"Artico Gelateria (Isola)",addr:"Via Porro Lambertenghi 15",lat:45.4892525,lng:9.1867155,pid:"ChIJpUrfLCzBhkcRY4Sp11cKCYM",hours:"Daily 12–23",price:"€",note:"Tre Coni. Maurizio Poloni also runs a gelato academy here: the most instructive stop for a future gelato maker. Try the pistachio granita and the rotating specials.",src:"[P][G]"},
+ {id:"ciacco",cat:"gelato",name:"Ciacco",addr:"Via Spadari 13",lat:45.4637013,lng:9.1868304,pid:"ChIJH_gyYqzGhkcRe6BjXrAbilY",hours:"Mon–Tue 8–21, Wed–Fri 8–22, Sat 9–22, Sun 13–21",price:"€",note:"Tre Coni. Scientific, additive-free, savoury-leaning flavours (lime and juniper, Mediterranean mojito). Two doors from Peck, 3 min from the Duomo. 10–15 min queue is normal.",src:"[P][G]"},
+ {id:"gnomo",cat:"gelato",name:"GnomoGelato",addr:"Via Francesco Cherubini 3",lat:45.4670882,lng:9.159251,pid:"ChIJJUwuEGfBhkcRoFkj1pZ_EwM",hours:"Daily 12–23 (weekend from 11)",price:"€",note:"Tre Coni, 1.3 km from the residence. Organic ingredients and, unusually, calories listed per flavour. Salted pistachio and ricotta are the ones people mention.",src:"[P][G]"},
+ {id:"terra",cat:"gelato",name:"Terra Gelato",addr:"Corso San Gottardo 1",lat:45.4518816,lng:9.1803939,pid:"ChIJO5VSWqnFhkcReqKZQwBH8zY",hours:"Daily 12:30–23",price:"€",note:"Tre Coni. Founded 2018 with a sustainability focus. Sits right at the Darsena, so it slots into a Navigli evening.",src:"[P][G]"},
+ {id:"crema",cat:"gelato",name:"CREMA Alta Gelateria",addr:"Via Fiori Chiari 16 (Brera)",lat:45.47219,lng:9.186524,pid:"ChIJ3-7jwqnHhkcR4njB2-95eZk",hours:"Daily 12–23:30",price:"€€",note:"Tre Coni newcomer: Roman maestro Claudio Torcé with Giorgio Bulgari. Very creamy style. Service reviews are mixed; go for the product.",src:"[P][G]"},
+ {id:"gusto17",cat:"gelato",name:"Gusto 17",addr:"Via Savona 17",lat:45.455192,lng:9.1676825,pid:"ChIJiRwoXuPDhkcRAkW1IRWSxlc",hours:"Daily 12–23:30",price:"€",note:"In the Gambero Rosso guide since opening; Forbes Italia top 100. Seasonal, experimental flavours that change weekly. Try the plain latte flavour to judge the base.",src:"[P][G]"},
+ {id:"siroliver",cat:"gelato",name:"Sir Oliver (Novate Milanese)",addr:"Via Garibaldi 31, Novate Milanese",lat:45.5329643,lng:9.1378231,pid:"ChIJO2L_ZHPAhkcREHNVc7sZONE",hours:"Daily 15–22:30",price:"€",note:"Tre Coni, outside the city. Only worth it if Thursday's vendor route passes near Novate or Rho. Locals call it the best in greater Milan.",src:"[P][G]"},
+ // tiramisu
+ {id:"mascherpa",cat:"tiramisu",name:"Mascherpa",addr:"Via De Amicis 7",lat:45.457329,lng:9.1804828,pid:"ChIJHZ64k__DhkcRF3BOcAcVdcg",hours:"Mon–Sat 9–22, Sun 12–20",price:"€",note:"Milan's tiramisù boutique: classic in jars plus variants (pistachio, salted caramel) and a deconstructed version that shows the mascarpone cream alone. Some reviewers question the jar ingredient list, so read the label. Specialty coffee here is very good.",src:"[P][G]"},
+ {id:"marchesi",cat:"tiramisu",name:"Marchesi 1824",addr:"Via Santa Maria alla Porta 11/a",lat:45.4655917,lng:9.1806772,pid:"ChIJD5IlqVPBhkcRr_-qUpovfSA",hours:"Mon–Sat 7:30–20, Sun 8:30–20",price:"€€",note:"Historic pasticceria, now Prada-owned but unchanged in spirit. Tiramisù, maritozzi, a famously light cappuccino. Stand at the counter like the regulars and it costs a fraction of sitting.",src:"[P][G]"},
+ {id:"cova",cat:"tiramisu",name:"Cova Montenapoleone",addr:"Via Monte Napoleone 8",lat:45.4681689,lng:9.1954589,pid:"ChIJtw59UdzDhkcRQYDSBkctXfM",hours:"Mon–Sat 8–20:30, Sun 9:30–19:30",price:"€€€",note:"Since 1817. Famous for panettone; tiramisù is a house specialty. On the fashion street, so tourist-adjacent and priced accordingly, but not a trap. Go early morning.",src:"[P][G]"},
+ {id:"martesana",cat:"tiramisu",name:"Pasticceria Martesana",addr:"Via Cagliero 14",lat:45.4958791,lng:9.203031,pid:"ChIJ87zdNCjHhkcR2CJUO4Q_Zs0",hours:"Daily 7:30–20",price:"€€",note:"Vincenzo Santoro's high-pastry benchmark; tiramisù, hot chocolate, panettone. Out of the way (Zara M3/M5), so combine with Isola or Centrale.",src:"[P][G]"},
+ // dinner
+ {id:"stoppani",cat:"dinner",name:"Consorzio Stoppani",addr:"Via Antonio Stoppani 15",lat:45.4750294,lng:9.2139764,pid:"ChIJMcOdLOvGhkcRcIu3aQQmDf0",hours:"Mon–Thu 19–24; Fri–Sun also 12–14",price:"€20–30",note:"Urban sagra atmosphere, huge portions. Pistachio-and-orange pork cotoletta €20, risotto with ossobuco €26, house tiramisù €6. Open Monday, which makes it your natural first-night dinner. Book.",src:"[P][G]"},
+ {id:"sincera",cat:"dinner",name:"Trattoria Sincera",addr:"Via Porpora 154",lat:45.486013,lng:9.2317787,pid:"ChIJPbcmSvbHhkcRwfCKs6iH2mI",hours:"Press: Tue–Sat 20–24, Sun 12:30–18:30. Confirm by phone",closed:["Mon"],price:"€25–35",note:"Lombardy-only ingredients, no pasta: risotto alla milanese €16, cotoletta €22–25, mondeghili €10, tiramisù €6. Far east side (Loreto), 35 min from the residence.",src:"[P][G]"},
+ {id:"conchetta",cat:"dinner",name:"Osteria Conchetta",addr:"Via Conchetta 8",lat:45.4465685,lng:9.1786007,pid:"ChIJMzo30AnEhkcRCOSIcP0eik4",hours:"Tue–Fri 19–23; Sat–Sun lunch too",closed:["Mon"],price:"€30–40",note:"Historic Naviglio Pavese osteria with the widest risotto list in this set (saffron, red wine, borlotti and luganega). Pairs with Terra Gelato and the Darsena walk.",src:"[P][G]"},
+ {id:"martino",cat:"dinner",name:"Da Martino",addr:"Via Carlo Farini 8",lat:45.483547,lng:9.181795,pid:"ChIJYwfyIjHBhkcR-l2qFCF4_0Y",hours:"Tue–Fri 19:30–23:45; Sat–Sun lunch too",closed:["Mon"],price:"€30–40",note:"Family-run, short menu, full of locals, praised cotoletta. Near Chinatown and Isola. One recent review says they were relocating nearby: confirm the address when booking.",src:"[P][G]"},
+ {id:"pieropia",cat:"dinner",name:"Piero e Pia",addr:"Via Vanvitelli 10",lat:45.4711925,lng:9.2215982,pid:"ChIJl9sGhY3GhkcRlulzALTmXYA",hours:"Tue–Sat 12:30–14:30 & 19:30–22:30; Sun lunch",closed:["Mon"],price:"€30–40",note:"Small, homey northern Italian cooking, very attentive service. Città Studi, east side. A quieter alternative if Stoppani is full.",src:"[P][G]"},
+ {id:"masuelli",cat:"dinner",name:"Trattoria Masuelli San Marco",addr:"Viale Umbria 80",lat:45.4563913,lng:9.2171908,pid:"ChIJ-_7vu4LGhkcRmixti3Qz7E4",hours:"Google: Mon–Tue 19–22; Wed–Sat lunch & dinner; Sun lunch. Press said closed Mon: confirm",price:"€45–55",treat:true,note:"Third-generation trattoria since 1921, Slow Food roots. Saffron risotto with ossobuco, cotoletta, vitello tonnato, Milanese meatballs, Piedmont wine list. The treat dinner. Book on their site.",src:"[P][G]"},
+ // asian
+ {id:"ravioleria",cat:"asian",name:"Ravioleria Sarpi",addr:"Via Paolo Sarpi 27",lat:45.4813458,lng:9.1760553,pid:"ChIJ0SLMvjnBhkcRAJkKVvChWjM",hours:"Daily ~10:30–15 & 16–22 (weekend continuous)",price:"€5–10",note:"Street-food counter, open kitchen. Pork dumplings €4.50, jian bing crêpes, hand-pulled lamian. Made with Italian meat and flour: a genuine Milan-Chinese hybrid. Stools next door.",src:"[P][G]"},
+ {id:"mo",cat:"asian",name:"Mo",addr:"Via Paolo Sarpi 25",lat:45.4813263,lng:9.1762072,pid:"ChIJkQw2eh3BhkcRjwFmAkirYE4",hours:"Daily 10–22:30",price:"€5–8",note:"Shaanxi roujiamo (12-hour braised pork in flatbread), liangpi cold noodles, baozi. Standing only. Two doors from the Ravioleria: eat one of each.",src:"[P][G]"},
+ {id:"tang",cat:"asian",name:"Tang Gourmet",addr:"Via Paolo Sarpi 17",lat:45.4814236,lng:9.177547,pid:"ChIJ2RIEYDfBhkcR95AXm5kjyBc",hours:"Daily 10–22:30",closed:["Wed"],price:"€10–15",note:"Order at the till, no bookings, fast. Come for the xiaolongbao and shengjianbao (€6 tasting); skip the rest of the menu. Rating is middling because service is brusque, not because of the dumplings.",src:"[P][G]"},
+ {id:"ramenamano",cat:"asian",name:"Ramenamano",addr:"Via Paolo Lomazzo 20",lat:45.4822938,lng:9.1720711,pid:"ChIJoblOsz7BhkcRik-e6cc6L9M",hours:"12–14:30 & 19–22:30",closed:["Tue"],price:"€15–20",note:"Lanzhou lamian, the hand-pulled ancestor of ramen, with a choice of noodle shapes. Beef broth is the one to order. Same building as Orsonero Lomazzo.",src:"[P][G]"},
+ {id:"tahua",cat:"asian",name:"Ta-Hua",addr:"Via Gustavo Fara 15",lat:45.4833393,lng:9.1980565,pid:"ChIJ-aSFUc7GhkcRKqMZ4Znyt-g",hours:"Daily 12–14:15 & 19–22:30",price:"€20–30",note:"Hong Kong-style since 1979, the closest thing here to what a Singaporean expects: steamed sea bass with ginger, dim sum, gong bao chicken. Near Centrale. This is the sit-down Asian dinner.",src:"[P][G]"},
+ {id:"mani",cat:"asian",name:"Mani in Noodles",addr:"Via Aminto Caretto 8",lat:45.4829555,lng:9.1997786,pid:"ChIJhz452wzHhkcRgQg8J1RDOY0",hours:"Mon–Sat 11:30–14:30 & 18:30–22:30",closed:["Sun"],price:"€15–20",note:"Small, owner-run, hand-cut noodles and xiaolongbao with thicker skins. Menu carries allergen ratings. Near Centrale, a few minutes from Ta-Hua.",src:"[P][G]"},
+ // cheap
+ {id:"spontini",cat:"cheap",name:"Spontini",addr:"Via Santa Radegonda 11",lat:45.4657451,lng:9.1912058,pid:"ChIJ9xFnaK7GhkcRaTQpPScKnUg",hours:"Daily 11–23",price:"€6–9",note:"Milanese thick-slab pizza since 1953, finished to order, eaten standing. Large margherita €9. Behind the Duomo.",src:"[K][G]"},
+ {id:"luini",cat:"cheap",name:"Panzerotti Luini",addr:"Via Santa Radegonda 16",lat:45.4658286,lng:9.1915578,pid:"ChIJoUEJQq7GhkcRI153LB6-eXY",hours:"Mon–Sat 10–20",closed:["Sun"],price:"€3–4",note:"Fried panzerotti, fast queue, opposite Spontini. Tourist-heavy but locals still go. Eat in the small park to the right rather than on the Duomo square.",src:"[K][G]"},
+ {id:"mercato",cat:"cheap",name:"Mercato Centrale",addr:"Via Sammartini 2 (Stazione Centrale)",lat:45.4866698,lng:9.2035192,pid:"ChIJhccWg6PHhkcRvvi6CCCa2vY",hours:"Daily 6:30–23",price:"€10–15",note:"Curated food hall on the side of Centrale: pasta, meat, pastry, a Ravioleria Sarpi outpost. Useful if you end up at the station or want variety for two.",src:"[P][G]"},
+ // fitness
+ {id:"virgin",cat:"fitness",name:"Virgin Active Corso Vercelli",addr:"Via Soresina 4",lat:45.4653359,lng:9.1621891,pid:"ChIJK50hCUnBhkcRoo7RYHswznI",hours:"Mon–Fri 6–23, Sat–Sun 8–20",price:"Day pass: ask at reception",note:"Virgin Active confirms paid single-day entry at every club, price set per club. Bring passport. Members say it is packed on weekday evenings and empty at 6 am opening, which suits a pre-fair Zone 2 ride. 1.4 km from the residence.",src:"[S][G]"},
+ {id:"montestella",cat:"fitness",name:"Parco Monte Stella",addr:"Via Terzaghi",lat:45.4902522,lng:9.1324444,pid:"ChIJk0QcGbHBhkcReUQmhpBhb3I",hours:"Always open",price:"Free",note:"Milan's artificial hill, 2 km from the residence. Loops for hill running or a BikeMi climb; mountain views on clear mornings. QT8 station (M1) at its foot.",src:"[G]"},
+ // shop
+ {id:"esselunga",cat:"shop",name:"Esselunga Via Monte Rosa",addr:"Via Monte Rosa",lat:45.474219,lng:9.149754,pid:"ChIJb30cv3HBhkcR-f7HgexK5vI",hours:"Mon–Sat 7:30–21, Sun 8–20",price:"",note:"400 m from the residence; Esselunga's second-ever store, rebuilt 2024. Bar Atlantic for breakfast, Elisenda pastry counter (with the Da Vittorio family), butcher, deli. Protein: bresaola, ricotta, Grana Padano, skyr, rotisserie chicken.",src:"[P][G]"},
+ {id:"eataly",cat:"shop",name:"Eataly Smeraldo",addr:"Piazza XXV Aprile 10",lat:45.4806249,lng:9.1878807,pid:"ChIJsVBjwTTBhkcR9brIBDpHppI",hours:"Daily 8–23",price:"",note:"One-stop souvenirs: regional pasta, oils, chocolate, wine. Also a restaurant floor. Between Garibaldi and Chinatown.",src:"[G]"},
+ {id:"peck",cat:"shop",name:"Peck",addr:"Via Spadari 9",lat:45.4635131,lng:9.1869525,pid:"ChIJTVAKcKzGhkcRMs7mktXAZeM",hours:"Mon 15–19:30, Tue–Sat 9–19:30",closed:["Sun"],price:"€€€",note:"Milan's grand deli since 1883: cheese counter, prepared food, wine cellar. Two doors from Ciacco. Expensive but the packaging makes gifts.",src:"[K][G]"},
+ {id:"rinascente",cat:"shop",name:"Rinascente food hall",addr:"Piazza del Duomo",lat:45.4649368,lng:9.1918228,pid:"ChIJC5I0NzXHhkcRqEoVi4VsJaE",hours:"Daily 10–21 (Fri–Sun to 22)",price:"",note:"Top floor food market and terrace facing the Duomo spires. Tax refund desk in the building. Quick, central, air-conditioned souvenir run.",src:"[G]"},
+ // sights
+ {id:"duomo",cat:"sight",name:"Duomo di Milano",addr:"Piazza del Duomo",lat:45.4640976,lng:9.1919265,pid:"ChIJoTZGw67GhkcREy4aECdOf6s",hours:"Daily 9–19",price:"Rooftop ticket, pre-book",note:"Book the rooftop online the day before and pick the lift; still 90 stairs at the top. Open Monday.",src:"[G]"},
+ {id:"cenacolo",cat:"sight",name:"Last Supper (Cenacolo)",addr:"Piazza Santa Maria delle Grazie 2",lat:45.4661853,lng:9.1706005,pid:"ChIJ76jHT1rBhkcRhv_9lZv4uG0",hours:"Tue–Sun 8:15–18:45",closed:["Mon"],price:"Timed ticket only",note:"1.9 km from the residence. Tickets sell out weeks ahead; check the official site daily for returns. 15-minute slots of 35 people.",src:"[G]"},
+ {id:"castello",cat:"sight",name:"Castello Sforzesco",addr:"Piazza Castello",lat:45.4704762,lng:9.1793325,pid:"ChIJPXupDrb8hkcRm8JyxGbdVmU",hours:"Grounds daily 7–19:30",price:"Grounds free",note:"Walk through to Parco Sempione and the Triennale. Cadorna station is beside it, so this is on your airport route.",src:"[G]"},
+ {id:"brera",cat:"sight",name:"Pinacoteca di Brera",addr:"Via Brera 28",lat:45.4719545,lng:9.1878145,pid:"ChIJH05-WBHuhkcRNjexLI56Nhs",hours:"Tue–Sun 8:30–19:15",closed:["Mon"],price:"Ticket",note:"Uncrowded mid-week; Raphael and Piero della Francesca rooms. CREMA gelateria is three streets away.",src:"[G]"},
+ {id:"darsena",cat:"sight",name:"Darsena & Navigli",addr:"Darsena del Naviglio",lat:45.4525663,lng:9.1777381,pid:"ChIJdSem7_jDhkcRMwQSlu0T9To",hours:"Evenings",price:"Aperitivo €10–14",note:"The canal basin for aperitivo hour. Terra Gelato is on the corner, Osteria Conchetta 10 min south, Cucchi 5 min north. Pick bars off the main strip for value.",src:"[K][G]"},
+ {id:"prada",cat:"sight",name:"Fondazione Prada",addr:"Largo Isarco 2",lat:45.4443556,lng:9.2052072,pid:"ChIJ16AE-J7GhkcRnxchwJ_WRRU",hours:"Wed–Mon 10–19",closed:["Tue"],price:"Ticket",note:"Contemporary art in a converted distillery; the gold-leaf tower and Wes Anderson-designed Bar Luce. Open Monday. Allow 2–3 hours.",src:"[G]"},
+ {id:"triennale",cat:"sight",name:"Triennale Milano",addr:"Viale Alemagna 6",lat:45.472233,lng:9.173607,pid:"ChIJRwVc7UXBhkcRIlGMal_aWHU",hours:"Tue–Sun 10:30–20",closed:["Mon"],price:"Per-exhibition tickets",note:"Design museum in Parco Sempione; the permanent Italian design collection is the reliable part. Relevant to product-development eyes.",src:"[G]"},
+ // figurine spots
+ {id:"galleria-f",cat:"figurine",name:"Galleria Vittorio Emanuele II (mosaic floor)",addr:"Piazza del Duomo",lat:45.4658434,lng:9.1899401,pid:"ChIJw7aG_QY1eUcRFtQJWKmcCyc",hours:"Open 24h; arcade empties before 8",price:"Free",note:"The classic: figure on the mosaic floor under the glass dome, shot low and wide. The bull mosaic is the famous square but any of the four coats of arms works. Before 8 am the floor is clear; by 10 it is a crowd.",src:"[K][G]"},
+ {id:"bosco-f",cat:"figurine",name:"Bosco Verticale & BAM lawns",addr:"Via De Castillia 11–28",lat:45.4857042,lng:9.1905385,pid:"ChIJIZuktDLBhkcReyE6f2hoUFQ",hours:"Park open 24h",price:"Free",note:"Tree-covered towers as a green backdrop; the BAM garden has low walls, benches and labelled planting beds to stand a figure in. Morning sun hits the towers from the east side.",src:"[G]"},
+ {id:"gae-f",cat:"figurine",name:"Piazza Gae Aulenti",addr:"Piazza Gae Aulenti",lat:45.4836757,lng:9.1896654,pid:"ChIJ0WESOTPBhkcRp4vLclj2VQs",hours:"Open 24h",price:"Free",note:"Raised circular piazza with reflecting pools and the UniCredit spire. Wet-stone reflections after the fountains run; clean modern lines for a product-style shot. Two minutes from Bosco Verticale and Eataly.",src:"[K][G]"},
+ {id:"galimberti-f",cat:"figurine",name:"Casa Galimberti",addr:"Via Malpighi 3",lat:45.4746232,lng:9.2070875,pid:"ChIJsZBndL_GhkcRSXmlUiR74v8",hours:"Facade always visible",price:"Free",note:"1905 Art Nouveau facade covered in painted majolica tiles and iron balconies: the most colourful wall in Milan. Shoot the figure on the pavement edge with tiles behind; there is a café underneath. Quiet street, Porta Venezia M1.",src:"[G]"},
+ {id:"necchi-f",cat:"figurine",name:"Villa Necchi Campiglio",addr:"Via Mozart 14",lat:45.4683715,lng:9.2017935,pid:"ChIJn2UxgrvGhkcRNLCIIIOoylM",hours:"Wed–Sun 10–18",closed:["Mon","Tue"],price:"€15",note:"1930s Portaluppi villa with a garden, one of the first private pools in Milan, and a tennis court. Elegant, uncrowded backdrops on weekday mornings. Check photo rules at the desk (garden is normally fine).",src:"[G]"},
+ {id:"lavandai-f",cat:"figurine",name:"Vicolo dei Lavandai",addr:"Vicolo Lavandai, Naviglio Grande",lat:45.4520768,lng:9.1747775,pid:"ChIJZ8BAnfnDhkcRyw-Ccn7V6nc",hours:"Open 24h",price:"Free",note:"Covered 18th-century washhouse on the Naviglio Grande: wooden beams, stone washing slabs, running water channel. Small-scale, textured, and the slabs are exactly figure height. Best late afternoon light.",src:"[K][G]"},
+ {id:"colonne-f",cat:"figurine",name:"Colonne di San Lorenzo",addr:"Corso di Porta Ticinese",lat:45.4581653,lng:9.1810499,pid:"ChIJpQh7KgDDhkcRMFvvPUBrAF0",hours:"Open 24h",price:"Free",note:"Sixteen Roman columns with a low stone base to stand things on, basilica behind. Locals sit here from evening on; daytime it is quiet. On the way to Mascherpa and the Navigli.",src:"[G]"},
+ {id:"tretorri-f",cat:"figurine",name:"Piazza Tre Torri (CityLife)",addr:"Piazza Tre Torri",lat:45.477814,lng:9.1565914,pid:"ChIJb6KS_GzBhkcRQdy_o3wGtEs",hours:"Open 24h",price:"Free",note:"Three curved skyscrapers around a car-free plaza, 1 km from the residence. Glass, planting, sculptural benches. Easiest early-morning or post-dinner shoot without crossing town.",src:"[K][G]"},
+ {id:"arco-f",cat:"figurine",name:"Arco della Pace",addr:"Piazza Sempione",lat:45.4756927,lng:9.1724514,pid:"ChIJz7dBqkfBhkcRFcbFfk20vPs",hours:"Open 24h",price:"Free",note:"Neoclassical arch with a wide paved square and low kerbs at figure height. Lit at night; lively evening scene with bars along the square. 1.7 km from the residence via Chinatown.",src:"[G]"},
+ {id:"montanelli-f",cat:"figurine",name:"Giardini Indro Montanelli",addr:"Via Palestro 14",lat:45.4741791,lng:9.2004552,pid:"ChIJC9Gf1Z_HhkcRH6EVb5Dg_PI",hours:"Daily 6:30–23:30",price:"Free",note:"Milan's oldest public garden: ponds, old trees, the planetarium dome. Soft green backgrounds for a figure on a bench or rock. Five minutes from Casa Galimberti and Pavé.",src:"[G]"},
+ {id:"corsocomo-f",cat:"figurine",name:"10 Corso Como courtyard",addr:"Corso Como 10",lat:45.481923,lng:9.1875087,pid:"ChIJkVs2nDTBhkcRmiGdp8UAZP4",hours:"Café/shop hours, roughly 10:30–20",price:"Free to enter",note:"Ivy-covered courtyard café behind a plain door: bistro tables, greenery, dappled light. A natural food-plus-figure setting. Between Garibaldi and Chinatown.",src:"[K][G]"},
+ // camera spots
+ {id:"duomo-c",cat:"camera",name:"Duomo rooftop at golden hour",addr:"Piazza del Duomo",lat:45.4640976,lng:9.1919265,pid:"ChIJoTZGw67GhkcREy4aECdOf6s",hours:"Last entry ~18:10; sunset mid-Sept ~19:30",price:"Rooftop ticket",note:"Spires against warm light, Alps on a clear evening at 24 mm; the Madonnina at 70 mm. Book the last slot. Tripods and large bags are refused; handheld at f/2.8 is fine.",src:"[K][G]"},
+ {id:"branca-c",cat:"camera",name:"Torre Branca",addr:"Viale Camoens 2, Parco Sempione",lat:45.4734697,lng:9.1728953,pid:"ChIJrxs7lEXBhkcR4V5LMTSeSyQ",hours:"Tue–Sun afternoons and 20:30–23:50; closed Mon; check for wind closures",closed:["Mon"],price:"€6–9",note:"108 m steel tower with a 360° platform: Castello, Duomo and the Porta Nuova towers in one frame. Evening slots give blue hour over the city. The cage mesh means shooting through gaps; 24 mm handles it.",src:"[G]"},
+ {id:"monumentale-c",cat:"camera",name:"Cimitero Monumentale",addr:"Piazzale Cimitero Monumentale",lat:45.4872519,lng:9.1778528,pid:"ChIJ86AjdDDBhkcRlB_wfs_iB1U",hours:"Tue–Sun 8–17:30",closed:["Mon"],price:"Free",note:"Open-air sculpture museum: Liberty, Gothic and modernist tombs under old trees. Superb for black and white and for 70 mm details. Respectful photography is accepted; no shoots near mourners. Ten minutes from Chinatown.",src:"[G]"},
+ {id:"centrale-c",cat:"camera",name:"Stazione Centrale hall",addr:"Piazza Duca d'Aosta 1",lat:45.487137,lng:9.204822,pid:"ChIJQ1j3T8XGhkcRKs-XGhSxJiI",hours:"Open ~5–1",price:"Free",note:"Monumental 1931 vaults with shafts of light in the departures hall; street candids on the steps. The facade is floodlit at night. Watch bags: pickpocket warnings are standard here.",src:"[G]"},
+ {id:"sanmaurizio-c",cat:"camera",name:"San Maurizio al Monastero Maggiore",addr:"Corso Magenta 15",lat:45.4656402,lng:9.1789374,pid:"ChIJ42GMgJi5hkcR70ydC_sBD-8",hours:"Tue–Sun 10–17",closed:["Mon"],price:"Free",note:"Every wall frescoed; called the Sistine Chapel of Milan and largely ignored by tourists. Dim: ISO 3200, f/2.8, wide. No flash. 700 m from the Last Supper.",src:"[G]"},
+ {id:"sansatiro-c",cat:"camera",name:"Santa Maria presso San Satiro",addr:"Via Torino",lat:45.4628771,lng:9.1876895,pid:"ChIJt1PB9qvGhkcRwIetkCDW1qM",hours:"Mon–Fri 7:30–18; weekend afternoons",price:"Free",note:"Bramante's false apse: 97 cm of relief that reads as a deep choir from the nave, then collapses as you walk sideways. Shoot the illusion at 35 mm from the centre aisle, then the reveal from the side. Two minutes from the Duomo.",src:"[G]"},
+ {id:"bam-c",cat:"camera",name:"Porta Nuova skyline from BAM",addr:"Via De Castillia 28",lat:45.4845641,lng:9.1926072,pid:"ChIJ90iZT83GhkcRXLqkHmqRL2w",hours:"Open 24h",price:"Free",note:"Bosco Verticale, the UniCredit spire and Diamond Tower from the garden paths; the circular planting beds give leading lines. West-facing light in the evening; also good at dawn with empty paths.",src:"[G]"},
+ {id:"naviglio-c",cat:"camera",name:"Naviglio Grande at dusk",addr:"Alzaia Naviglio Grande",lat:45.4520768,lng:9.1747775,pid:"ChIJZ8BAnfnDhkcRyw-Ccn7V6nc",hours:"Best 19:00–20:30",price:"Free",note:"Canal reflections, painted facades, bar lights coming on. Walk the Alzaia side for the classic view back toward the Darsena. Street shooting is easy here; nobody minds a camera.",src:"[K][G]"},
+ {id:"omenoni-c",cat:"camera",name:"Casa degli Omenoni",addr:"Via degli Omenoni 3",lat:45.4672254,lng:9.1920349,pid:"ChIJJcVcIK7GhkcRjHev6yHVw5c",hours:"Facade always visible",price:"Free",note:"1565 palace with eight giant stone telamons straining under the facade. A 70 mm detail study on a quiet lane two minutes from La Scala. Overcast light suits the stone.",src:"[G]"},
+ {id:"mercanti-c",cat:"camera",name:"Piazza dei Mercanti",addr:"Piazza dei Mercanti",lat:45.4646339,lng:9.187677,pid:"ChIJLxywR6zGhkcRzWA5FDqJTeE",hours:"Open 24h",price:"Free",note:"Medieval square one street from the Duomo, with the Loggia degli Osii and Palazzo della Ragione. Far fewer people than the cathedral square; some reviews call it scruffy, which is what makes the street shots.",src:"[G]"},
+ {id:"sarpi-c",cat:"camera",name:"Via Paolo Sarpi at night",addr:"Via Paolo Sarpi",lat:45.4813458,lng:9.1760553,pid:"ChIJ0SLMvjnBhkcRAJkKVvChWjM",hours:"Best 19:00–22:00",price:"Free",note:"Pedestrian street, red lanterns, steam from the dumpling counters, mixed Italian and Chinese signage. Street and food shooting in one walk, and it is dinner.",src:"[K][G]"}
+];
+
+// ---------- helpers ----------
+const DAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const today = DAYS[new Date().getDay()];
+function km(a,b){const R=6371,dLat=(b.lat-a.lat)*Math.PI/180,dLng=(b.lng-a.lng)*Math.PI/180,x=Math.sin(dLat/2)**2+Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLng/2)**2;return 2*R*Math.asin(Math.sqrt(x));}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+function gmapsPlace(p){return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.name+", "+p.addr+", Milano")}&query_place_id=${p.pid}`;}
+function gmapsDir(p){return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(p.name+", "+p.addr+", Milano")}&destination_place_id=${p.pid}&travelmode=transit`;}
+let toastT;function toast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("show"),1600);}
+async function copyCoords(p){const s=`${p.lat.toFixed(6)},${p.lng.toFixed(6)}`;try{await navigator.clipboard.writeText(s);toast("Coordinates copied");}catch(e){window.prompt("Copy coordinates",s);}}
+
+const ICONS={
+ map:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6-5.3-6-11a6 6 0 1 1 12 0c0 5.7-6 11-6 11z"/><circle cx="12" cy="10" r="2.3"/></svg>',
+ gm:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3h7v7M21 3l-9 9"/><path d="M19 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5"/></svg>',
+ dir:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-8-8 18-2-8-8-2z"/></svg>',
+ copy:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>'
+};
+
+function cardHTML(p, inSheet){
+  const c=CATS[p.cat];
+  const d=km(BASE,p);
+  const closedToday=p.closed&&p.closed.includes(today);
+  const badges=(closedToday?`<span class="badge closed">Closed today</span>`:"")+(p.treat?`<span class="badge treat">Treat dinner</span>`:"")+(d<1.6&&p.cat!=="base"?`<span class="badge near">Near base</span>`:"");
+  const meta=[p.addr, p.hours?`<b>${esc(p.hours)}</b>`:"", p.price?esc(p.price):"", p.cat!=="base"||p.id!=="residence"?`${d.toFixed(1)} km from base`:""].filter(Boolean).join(" · ");
+  return `<div class="card" id="card-${p.id}" style="--dot:${c.color}">
+    <div class="top"><span class="swatch"></span><div style="flex:1">
+      <h3>${esc(p.name)}${badges}</h3>
+      <div class="meta">${meta}</div>
+      <p class="note">${esc(p.note)}</p>
+      <div class="src">${esc(p.src)}${p.closed?" · Closed "+p.closed.join(", "):""}</div>
+    </div></div>
+    <div class="actions">
+      ${inSheet?"":`<button onclick="showOnMap('${p.id}')">${ICONS.map}Show on map</button>`}
+      <a href="${gmapsPlace(p)}" target="_blank" rel="noopener">${ICONS.gm}Open in Google Maps</a>
+      <a class="primary ${inSheet?"":"wide"}" href="${gmapsDir(p)}" target="_blank" rel="noopener">${ICONS.dir}Directions (transit)</a>
+      <button class="wide" onclick="copyCoords(PLACES.find(x=>x.id==='${p.id}'))">${ICONS.copy}Copy coordinates</button>
+    </div>
+  </div>`;
+}
+
+// ---------- map ----------
+const map=L.map("map",{zoomControl:false,attributionControl:true}).setView([45.472,9.178],13);
+L.control.zoom({position:"bottomright"}).addTo(map);
+L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",{maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>'}).addTo(map);
+const markers={};
+let activeCat="all";
+function makeIcon(p){const c=CATS[p.cat];const cls=p.cat==="base"?"pin base":"pin";return L.divIcon({className:"",html:`<div class="${cls}" style="background:${p.cat==="base"?"":c.color}"></div>`,iconSize:[26,26],iconAnchor:[13,26]});}
+PLACES.forEach(p=>{const m=L.marker([p.lat,p.lng],{icon:makeIcon(p),title:p.name,keyboard:true}).addTo(map);m.on("click",()=>openSheet(p));markers[p.id]=m;});
+function applyFilter(){
+  Object.values(markers).forEach(m=>map.removeLayer(m));
+  const shown=PLACES.filter(p=>activeCat==="all"||p.cat===activeCat||p.cat==="base");
+  shown.forEach(p=>markers[p.id].addTo(map));
+  document.querySelectorAll(".panel .opt").forEach(o=>o.classList.toggle("on",o.dataset.cat===activeCat));
+  document.getElementById("filterlabel").textContent=activeCat==="all"?"All places":CATS[activeCat].label;
+  document.getElementById("filterdot").style.setProperty("--dot",activeCat==="all"?"var(--saffron)":CATS[activeCat].color);
+  document.getElementById("filtercount").textContent=activeCat==="all"?PLACES.length:shown.filter(p=>p.cat===activeCat).length;
+  if(activeCat!=="all"){const pts=shown.filter(p=>p.cat===activeCat).map(p=>[p.lat,p.lng]);if(pts.length)map.fitBounds(pts,{padding:[40,40],maxZoom:15});}
+}
+const panel=document.getElementById("panel"),grid=document.getElementById("panelgrid"),fbtn=document.getElementById("filterbtn");
+grid.innerHTML=`<button class="opt all on" data-cat="all" style="--dot:var(--saffron)"><span class="dot"></span>All places</button>`+Object.entries(CATS).filter(([k])=>k!=="base").map(([k,c])=>`<button class="opt" data-cat="${k}" style="--dot:${c.color}"><span class="dot"></span>${c.label}</button>`).join("");
+function openPanel(){panel.classList.add("open");fbtn.setAttribute("aria-expanded","true");closeSheet();}
+function closePanel(){panel.classList.remove("open");fbtn.setAttribute("aria-expanded","false");}
+fbtn.onclick=()=>panel.classList.contains("open")?closePanel():openPanel();
+panel.addEventListener("click",e=>{const b=e.target.closest(".opt");if(!b){closePanel();return;}activeCat=b.dataset.cat;applyFilter();closePanel();});
+applyFilter();
+
+const sheet=document.getElementById("sheet"),sheetBody=document.getElementById("sheetBody");
+function openSheet(p){sheetBody.innerHTML=cardHTML(p,true);sheet.classList.add("open");}
+function closeSheet(){sheet.classList.remove("open");}
+document.getElementById("sheetClose").onclick=closeSheet;
+map.on("click",closeSheet);
+function showOnMap(id){const p=PLACES.find(x=>x.id===id);if(!p)return;if(activeCat!=="all"&&activeCat!==p.cat){activeCat="all";applyFilter();}switchView("map");setTimeout(()=>{map.invalidateSize();map.flyTo([p.lat,p.lng],16,{duration:.6});openSheet(p);},50);}
+
+// ---------- list ----------
+function renderList(){
+  const order=Object.keys(CATS);
+  const jump=`<div class="jump">${order.map(k=>`<button onclick="document.getElementById('g-${k}').scrollIntoView({behavior:'smooth',block:'start'})">${CATS[k].label}</button>`).join("")}</div>`;
+  const intro=`<div class="intro">Today is ${today}. Cards marked closed reflect Google hours checked 10 Sept 2026; confirm before travelling across town. Sources: [G] Google, [P] Italian food press 2025–26, [S] venue site, [K] general knowledge, unverified.</div>`;
+  const groups=order.map(k=>{const items=PLACES.filter(p=>p.cat===k);if(!items.length)return"";return `<section class="group" id="g-${k}" style="--dot:${CATS[k].color}"><h2><span class="dot"></span>${CATS[k].label} <small>${items.length}</small></h2><p class="blurb">${CATS[k].blurb}</p>${items.map(p=>cardHTML(p,false)).join("")}</section>`;}).join("");
+  document.getElementById("list").innerHTML=jump+intro+groups;
+}
+
+// ---------- info ----------
+document.getElementById("info").innerHTML=`
+<h2>The week</h2>
+<table>
+<tr><td>Mon 14</td><td>Land MXP morning. Malpensa Express to Cadorna, M1 to Amendola. Check-in 15:00. Free afternoon: Duomo, Castello, Chinatown. Dinner: Consorzio Stoppani or Masuelli (both open Monday; many others are not).</td></tr>
+<tr><td>Tue 15 – Wed 16</td><td>Lineapelle 9–18. Coffee at Esselunga's Bar Atlantic or Orsonero Lomazzo before the metro; fair food for lunch; leave by 16:30 for the city.</td></tr>
+<tr><td>Thu 17</td><td>Vendor visit outside Milan (town to be confirmed). Fair closes 16:00 if you return.</td></tr>
+<tr><td>Fri 18</td><td>Check-out 10:00. Morning for gelato benchmarking and souvenirs near the Duomo (Ciacco, Peck, Rinascente), then Cadorna → Malpensa.</td></tr>
+</table>
+
+<h2>Getting around</h2>
+<ul>
+<li>Single ticket €2.20, 90 minutes, unlimited changes. Rho Fieramilano is inside the urban Mi1–Mi3 fare. Day ticket €7.60 only pays off with 4+ rides.</li>
+<li>No paper tickets since 1 Jan 2026. Tap a contactless credit card at the gate (same card in and out) or buy a RicaricaMi card at a machine.</li>
+<li>M1 forks: board trains marked <b>Rho Fieramilano</b>, not Bisceglie.</li>
+<li>BikeMi: €4.50 day pass in the app, first 30 min of each ride free, credit cards only (debit refused). Runs 6:00–2:00. Martesana canal path for a longer ride.</li>
+</ul>
+
+<h2>Eating like a local</h2>
+<ul>
+<li>Breakfast is espresso or cappuccino plus one pastry, standing at the bar. Sitting doubles the price. Cappuccino after 11 marks you as a visitor; nobody minds.</li>
+<li>Dinner starts 19:30–20:00. A primo alone (risotto €14–16) with tap water (acqua del rubinetto) is a normal €18 dinner.</li>
+<li>The tiramisù most Italians know is the trattoria house version: savoiardi, espresso, mascarpone-and-egg cream, cocoa; no liqueur, no whipped cream in the Treviso original. Order it at Stoppani, Sincera or Masuelli.</li>
+<li>Coperto (€2–3 per head) is a cover charge, not a tip. Tipping is not expected; rounding up is enough.</li>
+</ul>
+
+<h2>Souvenirs</h2>
+<ul>
+<li>Panettone in September: Pavé, Marchesi, Cova, Martesana all sell year-round.</li>
+<li>Coffee beans from Orsonero or Loste; Milanese saffron (zafferano) sachets; Amedei or Domori chocolate; vacuum-packed Grana Padano or Parmigiano.</li>
+<li>Cured meats and fresh dairy are generally not allowed into Singapore. Check SFA before buying bresaola to take home.</li>
+</ul>
+
+<h2>Photography</h2>
+<ul>
+<li>Figurine list: backdrops at figure scale with somewhere to stand it. Every spot is free except Villa Necchi (€15). Go before 9 am for empty floors; Galleria and Duomo square are impossible after 10.</li>
+<li>Camera list: chosen for a 24–70 on a full frame. No tripods on the Duomo roof or in churches; no flash indoors. The Last Supper allows photos without flash [unverified for 2026]. Lineapelle exhibitors often forbid photos of samples: ask at each stand.</li>
+<li>Food shots: bar counters are dim and fast; f/2.8, 1/60, auto ISO. Ask "posso fare una foto?" and you will almost always get a yes.</li>
+</ul>
+
+<h2>Fitness</h2>
+<ul>
+<li>Virgin Active sells paid day entry at every club; ask reception for the price and bring your passport. Corso Vercelli is 1.4 km from the residence and quietest at 6 am.</li>
+<li>Gold's Gym (€30) and McFIT (€20) day passes require an Italian codice fiscale, so they are not practical.</li>
+<li>Outdoor: Monte Stella hill loops (2 km), Parco Sempione flats (2.5 km).</li>
+</ul>
+
+<h2>Still open</h2>
+<ul>
+<li>Thursday vendor town: once known, add a lunch stop and check whether Sir Oliver (Novate) is on the route.</li>
+<li>Masuelli Monday hours conflict between Google and press. Trust the booking system.</li>
+<li>Da Martino may have moved. Confirm address when booking.</li>
+</ul>
+<p class="tag">Content researched 10 Sept 2026. Hours from Google Places on that date.</p>`;
+
+// ---------- tabs ----------
+function switchView(v){document.querySelectorAll(".view").forEach(s=>s.classList.toggle("active",s.id==="view-"+v));document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.view===v));if(v==="map")setTimeout(()=>map.invalidateSize(),30);}
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>switchView(b.dataset.view));
+renderList();
+</script>
+</body>
+</html>
